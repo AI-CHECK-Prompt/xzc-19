@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: coldchain-postgres
+    environment:
+      POSTGRES_DB: coldchain
+      POSTGRES_USER: coldchain
+      POSTGRES_PASSWORD: coldchain_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coldchain -d coldchain"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: coldchain-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: coldchain
+      DB_USER: coldchain
+      DB_PASSWORD: coldchain_2026
+      SIG_KEY_DIR: /data/keys
+      EXPORT_TEMP_DIR: /data/exports
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend-data:/data
+
+  simulator:
+    build: ./simulator
+    container_name: coldchain-simulator
+    depends_on:
+      - backend
+    environment:
+      HTTP_URL: http://backend:8080
+    command: ["python", "simulator.py", "--http-url", "http://backend:8080",
+             "--devices", "100", "--ticks", "20", "--workers", "20",
+             "--inject-overheat-devices", "5"]
+
+volumes:
+  postgres-data:
+  backend-data:

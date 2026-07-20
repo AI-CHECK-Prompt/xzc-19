@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>冷链合规系统 - 药监局飞行检查专用</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #1976d2;
+            --danger: #d32f2f;
+            --warn: #f57c00;
+            --ok: #2e7d32;
+            --bg: #f5f7fa;
+            --card: #ffffff;
+            --border: #e0e4e8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: var(--bg); color: #333; }
+        .app { display: flex; min-height: 100vh; }
+        .sidebar { width: 220px; background: #1a2332; color: #cbd5e1; padding: 20px 0; }
+        .sidebar h2 { color: #fff; padding: 0 20px 20px; font-size: 16px; border-bottom: 1px solid #2a3342; }
+        .sidebar .nav-item { padding: 12px 20px; cursor: pointer; font-size: 14px; }
+        .sidebar .nav-item:hover { background: #2a3342; }
+        .sidebar .nav-item.active { background: var(--primary); color: #fff; }
+        .main { flex: 1; padding: 20px 30px; overflow-x: hidden; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header h1 { font-size: 22px; color: #1a2332; }
+        .header .badge { background: var(--danger); color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 10px; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 20px; margin-bottom: 16px; }
+        .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #1a2332; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+        .stat { background: var(--card); border: 1px solid var(--border); padding: 16px; border-radius: 6px; }
+        .stat .label { color: #64748b; font-size: 12px; }
+        .stat .value { font-size: 24px; font-weight: 600; margin-top: 6px; }
+        .stat.danger .value { color: var(--danger); }
+        .stat.ok .value { color: var(--ok); }
+        .stat.warn .value { color: var(--warn); }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: #f1f5f9; color: #475569; font-weight: 600; }
+        tr:hover { background: #f8fafc; }
+        .tag { padding: 2px 6px; border-radius: 3px; font-size: 11px; display: inline-block; }
+        .tag.danger { background: #fee2e2; color: var(--danger); }
+        .tag.warn { background: #fef3c7; color: var(--warn); }
+        .tag.ok { background: #dcfce7; color: var(--ok); }
+        .tag.info { background: #dbeafe; color: var(--primary); }
+        button, .btn { background: var(--primary); color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        button:hover { opacity: 0.9; }
+        button.danger { background: var(--danger); }
+        button.warn { background: var(--warn); }
+        button.ok { background: var(--ok); }
+        input, select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; }
+        .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+        .timeline { position: relative; padding-left: 24px; }
+        .timeline::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+        .timeline .item { position: relative; padding: 8px 0; font-size: 13px; }
+        .timeline .item::before { content: ''; position: absolute; left: -22px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+        .timeline .item.danger::before { background: var(--danger); }
+        .timeline .item.warn::before { background: var(--warn); }
+        .timeline .item.ok::before { background: var(--ok); }
+        .timeline .item .at { color: #64748b; font-size: 12px; margin-right: 8px; }
+        pre { background: #1a2332; color: #e2e8f0; padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+        .actions a { color: var(--primary); text-decoration: none; margin-right: 6px; font-size: 12px; }
+    </style>
+</head>
+<body>
+<div id="app" class="app">
+    <div class="sidebar">
+        <h2>🧊 冷链合规 v1.0</h2>
+        <div class="nav-item" :class="{active: page==='dashboard'}" @click="page='dashboard'">📊 仪表盘</div>
+        <div class="nav-item" :class="{active: page==='tasks'}" @click="page='tasks'">📦 运输任务</div>
+        <div class="nav-item" :class="{active: page==='audit'}" @click="page='audit'">⚖️ 审计与决策</div>
+        <div class="nav-item" :class="{active: page==='replay'}" @click="page='replay'">🎬 审计回放</div>
+        <div class="nav-item" :class="{active: page==='customs'}" @click="page='customs'">📑 海关报关</div>
+        <div class="nav-item" :class="{active: page==='export'}" @click="page='export'">📤 飞检导出</div>
+        <div class="nav-item" :class="{active: page==='selfcheck'}" @click="page='selfcheck'">🛡️ 自检</div>
+        <div class="nav-item" :class="{active: page==='simulator'}" @click="page='simulator'">🧪 模拟器</div>
+    </div>
+    <div class="main">
+        <div class="header">
+            <h1>{{ pageTitle }} <span class="badge" v-if="systemStatus!=='UP'">{{ systemStatus }}</span></h1>
+            <div>
+                <span style="color:#64748b; font-size:12px; margin-right:12px">用户: {{ user.fullName || '未登录' }} ({{ user.role || '-' }})</span>
+                <button @click="loadSystem" style="background:#64748b">🔄 刷新</button>
+            </div>
+        </div>
+
+        <!-- 仪表盘 -->
+        <div v-if="page==='dashboard'">
+            <div class="grid">
+                <div class="stat"><div class="label">运输任务总数</div><div class="value">{{ stats.taskCount }}</div></div>
+                <div class="stat ok"><div class="label">已放行</div><div class="value">{{ stats.released }}</div></div>
+                <div class="stat warn"><div class="label">人工审核中</div><div class="value">{{ stats.review }}</div></div>
+                <div class="stat danger"><div class="label">已拦截</div><div class="value">{{ stats.blocked }}</div></div>
+                <div class="stat"><div class="label">温控采样点（5 年累计）</div><div class="value">{{ stats.samples }}</div></div>
+                <div class="stat"><div class="label">审计报告数</div><div class="value">{{ stats.audits }}</div></div>
+            </div>
+            <div class="card" style="margin-top:16px">
+                <div class="card-title">最近拦截的任务（飞检重点）</div>
+                <table>
+                    <thead><tr><th>任务号</th><th>状态</th><th>起运→到达</th><th>拦截原因</th></tr></thead>
+                    <tbody>
+                    <tr v-for="t in blockedTasks" :key="t.id">
+                        <td>{{ t.taskNo }}</td>
+                        <td><span class="tag danger">{{ t.status }}</span></td>
+                        <td>{{ t.origin }} → {{ t.destination }}</td>
+                        <td>见审计报告</td>
+                    </tr>
+                    <tr v-if="!blockedTasks.length"><td colspan="4" style="text-align:center;color:#94a3b8">无拦截任务</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 任务 -->
+        <div v-if="page==='tasks'">
+            <div class="card">
+                <div class="card-title">新建运输任务</div>
+                <div class="toolbar">
+                    <input v-model="newTask.taskNo" placeholder="任务号">
+                    <input v-model="newTask.origin" placeholder="起运地">
+                    <input v-model="newTask.destination" placeholder="目的地">
+                    <input v-model="newTask.driverName" placeholder="司机">
+                    <input v-model="newTask.vehicleNo" placeholder="车牌">
+                    <button @click="createTask">创建</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">运输任务列表</div>
+                <table>
+                    <thead><tr><th>任务号</th><th>状态</th><th>起运→到达</th><th>起运时间</th><th>到达时间</th><th>操作</th></tr></thead>
+                    <tbody>
+                    <tr v-for="t in tasks" :key="t.id">
+                        <td>{{ t.taskNo }}</td>
+                        <td><span :class="statusTag(t.status)">{{ t.status }}</span></td>
+                        <td>{{ t.origin }} → {{ t.destination }}</td>
+                        <td>{{ formatTime(t.departureAt) }}</td>
+                        <td>{{ formatTime(t.arrivalAt) }}</td>
+                        <td>
+                            <a @click="departTask(t)">发车</a>
+                            <a @click="arriveTask(t)">到达</a>
+                            <a @click="replayTask(t)">回放</a>
+                            <a @click="auditTask(t)">审计</a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 审计 -->
+        <div v-if="page==='audit'">
+            <div class="card">
+                <div class="card-title">触发审计</div>
+                <div class="toolbar">
+                    <input v-model="auditTaskNo" placeholder="任务号">
+                    <button @click="runAudit">▶ 运行审计</button>
+                </div>
+            </div>
+            <div v-if="auditResult" class="card">
+                <div class="card-title">
+                    审计结果：<span :class="statusTag(auditResult.status)">{{ auditResult.status }}</span>
+                    <span style="color:#64748b; font-size:12px; margin-left:12px">耗时 {{ auditResult.durationMs }}ms</span>
+                </div>
+                <div class="grid">
+                    <div class="stat danger"><div class="label">CRITICAL</div><div class="value">{{ auditResult.criticalCount }}</div></div>
+                    <div class="stat warn"><div class="label">MAJOR</div><div class="value">{{ auditResult.majorCount }}</div></div>
+                    <div class="stat"><div class="label">MINOR</div><div class="value">{{ auditResult.minorCount }}</div></div>
+                    <div class="stat danger"><div class="label">BLOCK</div><div class="value">{{ auditResult.blockCount }}</div></div>
+                    <div class="stat warn"><div class="label">REVIEW</div><div class="value">{{ auditResult.reviewCount }}</div></div>
+                </div>
+                <h4 style="margin:16px 0 8px">证据详情</h4>
+                <table>
+                    <thead><tr><th>规则</th><th>严重</th><th>动作</th><th>时间区间</th><th>温度</th><th>说明</th></tr></thead>
+                    <tbody>
+                    <tr v-for="f in auditResult.findings" :key="f.id">
+                        <td>{{ f.ruleCode }}</td>
+                        <td><span :class="sevTag(f.severity)">{{ f.severity }}</span></td>
+                        <td><span :class="actTag(f.action)">{{ f.action }}</span></td>
+                        <td>{{ f.timeRangeStart }} ~ {{ f.timeRangeEnd }}</td>
+                        <td>{{ f.temperatureMin }} ~ {{ f.temperatureMax }}</td>
+                        <td>{{ f.description }}</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card">
+                <div class="card-title">放行决策</div>
+                <div class="toolbar">
+                    <input v-model="decision.taskNo" placeholder="任务号">
+                    <select v-model="decision.decision">
+                        <option value="RELEASE">放行</option>
+                        <option value="BLOCK">拦截</option>
+                        <option value="CONDITIONAL_RELEASE">条件放行</option>
+                    </select>
+                    <input v-model="decision.decidedBy" placeholder="决策人">
+                    <input v-model="decision.comment" placeholder="备注">
+                    <button @click="submitDecision">提交</button>
+                </div>
+                <pre v-if="decisionResult">{{ JSON.stringify(decisionResult, null, 2) }}</pre>
+            </div>
+        </div>
+
+        <!-- 回放 -->
+        <div v-if="page==='replay'">
+            <div class="card">
+                <div class="card-title">审计回放</div>
+                <div class="toolbar">
+                    <input v-model="replayTaskNo" placeholder="任务号">
+                    <button @click="runReplay">▶ 加载回放</button>
+                </div>
+            </div>
+            <div v-if="replayData">
+                <div class="card">
+                    <div class="card-title">完整性校验</div>
+                    <pre>{{ JSON.stringify(replayData.integrityCheck, null, 2) }}</pre>
+                </div>
+                <div class="card">
+                    <div class="card-title">温度曲线</div>
+                    <canvas id="tempChart" height="120"></canvas>
+                </div>
+                <div class="card">
+                    <div class="card-title">完整时间轴（{{ replayData.timeline.length }} 个事件）</div>
+                    <div class="timeline">
+                        <div v-for="(e,i) in replayData.timeline.slice(0, 200)" :key="i"
+                             :class="evtClass(e)" class="item">
+                            <span class="at">{{ e.at }}</span>
+                            <b>[{{ e.type }}]</b> {{ e.data }}
+                        </div>
+                        <div v-if="replayData.timeline.length > 200" style="color:#64748b; font-size:12px; margin-top:8px">
+                            仅显示前 200 条，共 {{ replayData.timeline.length }} 条
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 海关 -->
+        <div v-if="page==='customs'">
+            <div class="card">
+                <div class="card-title">报关单结构化解析 + 批号匹配</div>
+                <div class="toolbar">
+                    <input v-model="customs.declNo" placeholder="报关单号">
+                    <input v-model="customs.consignor" placeholder="发货人">
+                    <input v-model="customs.consignee" placeholder="收货人">
+                    <input v-model="customs.totalValue" placeholder="货值">
+                    <input v-model="customs.currency" placeholder="币种">
+                </div>
+                <h4>报关药品列表</h4>
+                <div v-for="(b, i) in customs.batches" :key="i" class="toolbar">
+                    <input v-model="b.batchNo" placeholder="批号">
+                    <input v-model="b.qty" type="number" placeholder="数量">
+                    <input v-model="b.product" placeholder="产品名">
+                    <button class="danger" @click="customs.batches.splice(i,1)">删除</button>
+                </div>
+                <button @click="customs.batches.push({batchNo:'',qty:0,product:''})">+ 增加药品</button>
+                <button @click="submitCustoms" style="margin-left:10px">▶ 解析并匹配</button>
+            </div>
+            <div v-if="customsResult" class="card">
+                <div class="card-title">匹配结果：
+                    <span :class="customsResult.overallOk ? 'tag ok' : 'tag danger'">
+                        {{ customsResult.overallOk ? '全部匹配' : '存在不匹配' }}
+                    </span>
+                </div>
+                <table>
+                    <thead><tr><th>报关批号</th><th>系统批号</th><th>报关数量</th><th>系统数量</th><th>状态</th><th>说明</th></tr></thead>
+                    <tbody>
+                    <tr v-for="(it, i) in customsResult.items" :key="i">
+                        <td>{{ it.declaredBatchNo }}</td>
+                        <td>{{ it.matchedBatchNo || '—' }}</td>
+                        <td>{{ it.declaredQty }}</td>
+                        <td>{{ it.actualQty || '—' }}</td>
+                        <td><span :class="matchTag(it.matchStatus)">{{ matchStatusText(it.matchStatus) }}</span></td>
+                        <td>{{ it.detail || '—' }}</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 导出 -->
+        <div v-if="page==='export'">
+            <div class="card">
+                <div class="card-title">飞检数据导出（XML / PDF / Excel）</div>
+                <div class="toolbar">
+                    <input v-model="exportTaskNo" placeholder="任务号">
+                    <button @click="doExport('xml')">📄 XML</button>
+                    <button @click="doExport('pdf')">📕 PDF</button>
+                    <button @click="doExport('excel')" class="ok">📊 Excel</button>
+                </div>
+                <div v-if="exportResults.length" style="margin-top:12px">
+                    <h4>导出记录</h4>
+                    <div v-for="(r,i) in exportResults" :key="i" class="card" style="background:#f8fafc">
+                        <div><b>{{ r.format.toUpperCase() }}</b> — 任务 {{ r.taskNo }}</div>
+                        <div>文件：<a :href="r.url" target="_blank">{{ r.file }}</a></div>
+                        <pre style="margin-top:6px">{{ JSON.stringify(r, null, 2) }}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 自检 -->
+        <div v-if="page==='selfcheck'">
+            <div class="card">
+                <div class="card-title">飞检 6 项硬验收</div>
+                <button @click="runSelfCheck" class="ok">▶ 立即自检</button>
+            </div>
+            <div v-if="selfCheckResult" class="card">
+                <div class="card-title">
+                    整体：<span :class="selfCheckResult.overallOk ? 'tag ok' : 'tag danger'">
+                        {{ selfCheckResult.overallOk ? '全部通过' : '存在失败' }}
+                    </span>
+                </div>
+                <table>
+                    <thead><tr><th>序号</th><th>检查项</th><th>类别</th><th>结果</th><th>耗时</th><th>详情</th></tr></thead>
+                    <tbody>
+                    <tr v-for="(it, i) in selfCheckResult.items" :key="i">
+                        <td>{{ i+1 }}</td>
+                        <td>{{ it.name }}</td>
+                        <td><span class="tag info">{{ it.category }}</span></td>
+                        <td><span :class="it.passed ? 'tag ok' : 'tag danger'">{{ it.passed ? 'PASS' : 'FAIL' }}</span></td>
+                        <td>{{ it.durationMs }}ms</td>
+                        <td style="font-size:12px; color:#475569">{{ it.message }}</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 模拟器 -->
+        <div v-if="page==='simulator'">
+            <div class="card">
+                <div class="card-title">温控设备模拟器（百设备并发）</div>
+                <div class="toolbar">
+                    <label>设备数 <input v-model.number="simConfig.devices" type="number" style="width:80px"></label>
+                    <label>采样点/设备 <input v-model.number="simConfig.ticks" type="number" style="width:80px"></label>
+                    <label>并发 <input v-model.number="simConfig.workers" type="number" style="width:60px"></label>
+                    <label>注入超温设备 <input v-model.number="simConfig.overheat" type="number" style="width:80px"></label>
+                </div>
+                <button @click="runSimulator" class="ok">▶ 启动模拟器</button>
+            </div>
+            <div v-if="simLog" class="card">
+                <div class="card-title">运行日志</div>
+                <pre>{{ simLog }}</pre>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+const { createApp, ref, reactive, onMounted, computed, nextTick } = Vue;
+const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:8080'
+    : `http://${window.location.hostname}:8080`;
+
+createApp({
+    setup() {
+        const page = ref('dashboard');
+        const systemStatus = ref('UP');
+        const user = reactive({ username: 'auditor', fullName: '王审计', role: 'AUDITOR' });
+        const tasks = ref([]);
+        const blockedTasks = ref([]);
+        const stats = reactive({ taskCount:0, released:0, review:0, blocked:0, samples:0, audits:0 });
+        const newTask = reactive({ taskNo:'', origin:'', destination:'', driverName:'', vehicleNo:'' });
+        const auditTaskNo = ref('');
+        const auditResult = ref(null);
+        const decision = reactive({ taskNo:'', decision:'RELEASE', decidedBy:'王审计', comment:'' });
+        const decisionResult = ref(null);
+        const replayTaskNo = ref('');
+        const replayData = ref(null);
+        const customs = reactive({ declNo:'', consignor:'', consignee:'', totalValue:'', currency:'USD',
+                                    batches:[{batchNo:'',qty:0,product:''}] });
+        const customsResult = ref(null);
+        const exportTaskNo = ref('');
+        const exportResults = ref([]);
+        const selfCheckResult = ref(null);
+        const simConfig = reactive({ devices:100, ticks:20, workers:20, overheat:5 });
+        const simLog = ref('');
+
+        const pageTitle = computed(() => ({
+            dashboard:'📊 仪表盘', tasks:'📦 运输任务', audit:'⚖️ 审计与决策',
+            replay:'🎬 审计回放', customs:'📑 海关报关', export:'📤 飞检导出',
+            selfcheck:'🛡️ 接口自检', simulator:'🧪 模拟器'
+        })[page.value]);
+
+        function statusTag(s) { return { CREATED:'tag info', IN_TRANSIT:'tag warn', ARRIVED:'tag info',
+            AUDITING:'tag warn', RELEASED:'tag ok', BLOCKED:'tag danger', CONDITIONAL:'tag warn',
+            PASS:'tag ok', REVIEW:'tag warn', BLOCK:'tag danger' }[s] || 'tag info'; }
+        function sevTag(s) { return { CRITICAL:'tag danger', MAJOR:'tag warn', MINOR:'tag info' }[s] || 'tag info'; }
+        function actTag(s) { return { BLOCK:'tag danger', REVIEW:'tag warn' }[s] || 'tag info'; }
+        function matchTag(s) { return { MATCHED:'tag ok', MISMATCH:'tag danger', MISSING:'tag warn' }[s] || 'tag info'; }
+        function matchStatusText(s) { return { MATCHED:'匹配', MISMATCH:'不一致', MISSING:'缺失' }[s] || s; }
+        function evtClass(e) { return { AUDIT:'warn', DECISION:e.data==='BLOCK'?'danger':(e.data==='RELEASE'?'ok':'') }[e.type] || ''; }
+        function formatTime(t) { return t ? t.replace('T',' ').substring(0,19) : '—'; }
+
+        async function api(method, url, body) {
+            try {
+                const r = await axios({ method, url: API + url, data: body,
+                    headers: { 'Content-Type': 'application/json' } });
+                return r.data;
+            } catch (e) {
+                console.error(e);
+                alert('API 失败: ' + (e.response?.data?.message || e.message));
+                throw e;
+            }
+        }
+
+        async function loadSystem() {
+            const ts = await api('GET', '/api/tasks');
+            tasks.value = ts;
+            stats.taskCount = ts.length;
+            stats.released = ts.filter(t => t.status === 'RELEASED').length;
+            stats.review = ts.filter(t => t.status === 'CONDITIONAL' || t.status === 'AUDITING').length;
+            stats.blocked = ts.filter(t => t.status === 'BLOCKED').length;
+            blockedTasks.value = ts.filter(t => t.status === 'BLOCKED');
+            // samples
+            try {
+                const sc = await api('GET', '/api/self-check/ping');
+                if (sc.status === 'UP') systemStatus.value = 'UP';
+            } catch (e) { systemStatus.value = 'DOWN'; }
+        }
+
+        async function createTask() {
+            if (!newTask.taskNo) return alert('请填任务号');
+            await api('POST', '/api/tasks', newTask);
+            Object.assign(newTask, { taskNo:'', origin:'', destination:'', driverName:'', vehicleNo:'' });
+            await loadSystem();
+        }
+        async function departTask(t) { await api('POST', `/api/tasks/${t.taskNo}/depart`); await loadSystem(); }
+        async function arriveTask(t) { await api('POST', `/api/tasks/${t.taskNo}/arrive`); await loadSystem(); }
+        async function replayTask(t) { page.value='replay'; replayTaskNo.value=t.taskNo; await runReplay(); }
+        async function auditTask(t) { page.value='audit'; auditTaskNo.value=t.taskNo; await runAudit(); }
+
+        async function runAudit() {
+            if (!auditTaskNo.value) return;
+            const r = await api('POST', `/api/audit/run/${auditTaskNo.value}`);
+            auditResult.value = r;
+            decision.taskNo = auditTaskNo.value;
+        }
+        async function submitDecision() {
+            if (!decision.taskNo) return;
+            const r = await api('POST', '/api/audit/decide', decision);
+            decisionResult.value = r;
+            await loadSystem();
+        }
+        async function runReplay() {
+            if (!replayTaskNo.value) return;
+            const r = await api('GET', `/api/replay/${replayTaskNo.value}`);
+            replayData.value = r;
+            await nextTick();
+            drawTempChart();
+        }
+        function drawTempChart() {
+            const el = document.getElementById('tempChart');
+            if (!el || !replayData.value) return;
+            const data = replayData.value.temperatureCurve;
+            if (!data.length) return;
+            new Chart(el, {
+                type: 'line',
+                data: {
+                    labels: data.map(p => p.at.substring(11, 19)),
+                    datasets: [{
+                        label: '温度 (℃)',
+                        data: data.map(p => parseFloat(p.temperature)),
+                        borderColor: '#1976d2',
+                        backgroundColor: 'rgba(25,118,210,0.1)',
+                        fill: true,
+                        pointRadius: 2,
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: true } } }
+            });
+        }
+        async function submitCustoms() {
+            const body = { ...customs, declaredBatches: customs.batches };
+            customsResult.value = await api('POST', '/api/customs/parse', body);
+        }
+        async function doExport(fmt) {
+            if (!exportTaskNo.value) return alert('请填任务号');
+            const r = await api('POST', `/api/export/${fmt}?taskNo=${exportTaskNo.value}`);
+            exportResults.value.unshift(r);
+        }
+        async function runSelfCheck() {
+            selfCheckResult.value = await api('GET', '/api/self-check');
+        }
+        async function runSimulator() {
+            simLog.value = '启动中...';
+            try {
+                const r = await axios.post(API + '/api/sim/run', simConfig);
+                simLog.value = r.data.log || JSON.stringify(r.data, null, 2);
+                await loadSystem();
+            } catch (e) {
+                simLog.value = '错误: ' + e.message + '\n请确保后端已启动并提供 /api/sim/run 接口';
+            }
+        }
+
+        onMounted(loadSystem);
+
+        return {
+            page, pageTitle, systemStatus, user, tasks, blockedTasks, stats, newTask,
+            auditTaskNo, auditResult, decision, decisionResult, replayTaskNo, replayData,
+            customs, customsResult, exportTaskNo, exportResults, selfCheckResult, simConfig, simLog,
+            API, statusTag, sevTag, actTag, matchTag, matchStatusText, evtClass, formatTime,
+            loadSystem, createTask, departTask, arriveTask, replayTask, auditTask,
+            runAudit, submitDecision, runReplay, submitCustoms, doExport, runSelfCheck, runSimulator
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
