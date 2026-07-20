@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" name="com.coldchain.compliance.service.IngestServiceTest" time="0.861" tests="5" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" name="com.coldchain.compliance.service.DecisionServiceTest" time="1.46" tests="6" errors="0" skipped="0" failures="0">
   <properties>
     <property name="sun.desktop" value="windows"/>
     <property name="awt.toolkit" value="sun.awt.windows.WToolkit"/>
@@ -60,9 +60,10 @@
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="52.0"/>
   </properties>
-  <testcase name="ingest_sameDevice_sameBatch_chainIsContiguous" classname="com.coldchain.compliance.service.IngestServiceTest" time="0.231"/>
-  <testcase name="ingest_singleSample_firstHashHasNoPrev" classname="com.coldchain.compliance.service.IngestServiceTest" time="0.082"/>
-  <testcase name="ingest_continuesChainFromDbHistory" classname="com.coldchain.compliance.service.IngestServiceTest" time="0.134"/>
-  <testcase name="ingest_mixedDevices_chainsAreIsolated" classname="com.coldchain.compliance.service.IngestServiceTest" time="0.112"/>
-  <testcase name="ingest_midBatchSaveFailure_noPhantomChainPointer" classname="com.coldchain.compliance.service.IngestServiceTest" time="0.298"/>
+  <testcase name="decide_basisContainsFindingSeverityAndTempRange" classname="com.coldchain.compliance.service.DecisionServiceTest" time="0.298"/>
+  <testcase name="decide_releaseWhenTempNotOk_isRejectedByGxp" classname="com.coldchain.compliance.service.DecisionServiceTest" time="0.206"/>
+  <testcase name="decide_tempOkButCustomsNotOk_downgradesToConditional" classname="com.coldchain.compliance.service.DecisionServiceTest" time="0.285"/>
+  <testcase name="decide_explicitConditional_landsAsConditional" classname="com.coldchain.compliance.service.DecisionServiceTest" time="0.287"/>
+  <testcase name="decide_allPass_releaseLands" classname="com.coldchain.compliance.service.DecisionServiceTest" time="0.161"/>
+  <testcase name="decide_auditBlock_stillRejectsRelease" classname="com.coldchain.compliance.service.DecisionServiceTest" time="0.219"/>
 </testsuite>

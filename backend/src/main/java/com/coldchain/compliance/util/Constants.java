@@ -18,6 +18,7 @@ public final class Constants {
     public static final String TASK_AUDITING = "AUDITING";
     public static final String TASK_RELEASED = "RELEASED";
     public static final String TASK_BLOCKED = "BLOCKED";
+    public static final String TASK_CONDITIONAL = "CONDITIONAL";
 
     // 审计
     public static final String AUDIT_PASS = "PASS";
