@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" name="com.coldchain.compliance.service.IngestServiceTest" time="0.702" tests="5" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" name="com.coldchain.compliance.engine.RuleEngineCumulativeTest" time="1.913" tests="3" errors="0" skipped="0" failures="0">
   <properties>
     <property name="sun.desktop" value="windows"/>
     <property name="awt.toolkit" value="sun.awt.windows.WToolkit"/>
@@ -60,9 +60,7 @@
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="52.0"/>
   </properties>
-  <testcase name="ingest_sameDevice_sameBatch_chainIsContiguous" classname="com.coldchain.compliance.service.IngestServiceTest" time="0.244"/>
-  <testcase name="ingest_singleSample_firstHashHasNoPrev" classname="com.coldchain.compliance.service.IngestServiceTest" time="0.133"/>
-  <testcase name="ingest_continuesChainFromDbHistory" classname="com.coldchain.compliance.service.IngestServiceTest" time="0.117"/>
-  <testcase name="ingest_mixedDevices_chainsAreIsolated" classname="com.coldchain.compliance.service.IngestServiceTest" time="0.083"/>
-  <testcase name="ingest_midBatchSaveFailure_noPhantomChainPointer" classname="com.coldchain.compliance.service.IngestServiceTest" time="0.122"/>
+  <testcase name="cumulative_lastSegmentStillHot_emitsFinding" classname="com.coldchain.compliance.engine.RuleEngineCumulativeTest" time="1.565"/>
+  <testcase name="cumulative_lastSegmentStillCold_emitsFinding" classname="com.coldchain.compliance.engine.RuleEngineCumulativeTest" time="0.22"/>
+  <testcase name="cumulative_lastSegmentShort_noFinding" classname="com.coldchain.compliance.engine.RuleEngineCumulativeTest" time="0.112"/>
 </testsuite>

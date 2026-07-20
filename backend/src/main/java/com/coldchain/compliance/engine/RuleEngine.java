@@ -224,6 +224,7 @@ public class RuleEngine {
         OffsetDateTime aboveStart = null, belowStart = null;
         List<Map<String, Object>> aboveEvid = new ArrayList<>(), belowEvid = new ArrayList<>();
 
+        OffsetDateTime lastAt = samples.get(samples.size() - 1).getSampleAt();
         for (int i = 0; i < samples.size(); i++) {
             TempSample s = samples.get(i);
             BigDecimal t = s.getTemperature();
@@ -257,6 +258,16 @@ public class RuleEngine {
                 }
                 belowStart = null; belowSec = 0; belowEvid.clear();
             }
+        }
+        // 兜底：循环结束时若末段仍处于超温/低温状态且持续 >= 1 分钟，
+        // 需以最后一条样本时间作为 end 触发 finding，否则末段 finding 永远丢失。
+        if (aboveStart != null && aboveSec / 60 >= 1) {
+            maybeEmitCumulative(out, rule, task, "above", aboveStart, lastAt,
+                    aboveSec, aboveEvid, maxAboveMin);
+        }
+        if (belowStart != null && belowSec / 60 >= 1) {
+            maybeEmitCumulative(out, rule, task, "below", belowStart, lastAt,
+                    belowSec, belowEvid, maxBelowMin);
         }
         return out;
     }
