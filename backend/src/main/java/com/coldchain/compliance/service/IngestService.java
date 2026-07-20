@@ -70,7 +70,9 @@ public class IngestService {
                                 .findTopByDeviceNoOrderBySeqNoDesc(dto.getDeviceNo()).orElse(null);
                         if (last != null) prev = last.getPayloadHash();
                     }
-                    lastHash.put(dto.getDeviceNo(), prev);
+                    // 注意：lastHash 必须等 save 成功后再写入新 hash，避免"已写入但未续链"状态残留
+                    // 且写入值必须是本条新算出的 hash（而非 prev），否则同批后续样本的 prevHash
+                    // 全部指向同一历史值，replay 校验会得到 BROKEN。
 
                     Map<String, Object> payloadMap = new LinkedHashMap<>();
                     payloadMap.put("deviceNo", dto.getDeviceNo());
@@ -102,6 +104,8 @@ public class IngestService {
                     s.setSignature(sig);
                     s.setSeqNo(dto.getSeqNo());
                     sampleRepo.save(s);
+                    // 仅在 WORM 持久化成功后才推进链指针，杜绝"已写入但未续链"残留
+                    lastHash.put(dto.getDeviceNo(), hash);
                     resp.setSampleAccepted(resp.getSampleAccepted() + 1);
                 } catch (Exception e) {
                     resp.setSampleRejected(resp.getSampleRejected() + 1);

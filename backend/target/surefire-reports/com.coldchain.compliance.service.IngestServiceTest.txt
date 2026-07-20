@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.coldchain.compliance.service.IngestServiceTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.665 s - in com.coldchain.compliance.service.IngestServiceTest
