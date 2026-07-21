@@ -304,6 +304,198 @@ class DecisionServiceTest {
         assertEquals(Constants.DECISION_CONDITIONAL, basis.get("finalDecision"));
     }
 
+    /**
+     * 场景：BLOCK→PASS 仅间隔 5 分钟（整改观察窗 30 分钟内）→ 形式合规绕过被 GxP 拦截。
+     * 模拟"审计员补录 3 条合规样本触发重新审计拿到 PASS"绕过路径。
+     */
+    @Test
+    void decide_blockToPassWithinRemediationWindow_isRejectedByGxpHistoryCheck() {
+        // 两条审计：先 BLOCK（5 分钟前结束），再 PASS（刚刚启动）
+        AuditReport block = new AuditReport();
+        block.setId(1L);
+        block.setTaskId(100L);
+        block.setStatus(Constants.AUDIT_BLOCK);
+        block.setRuleVersion(2);
+        block.setStartedAt(OffsetDateTime.parse("2026-07-20T00:00:00Z"));
+        block.setFinishedAt(OffsetDateTime.parse("2026-07-20T01:00:00Z"));
+        block.setFindingCount(3);
+
+        AuditReport pass = new AuditReport();
+        pass.setId(2L);
+        pass.setTaskId(100L);
+        pass.setStatus(Constants.AUDIT_PASS);
+        pass.setRuleVersion(2);
+        pass.setStartedAt(OffsetDateTime.parse("2026-07-20T01:05:00Z"));  // 仅 5 分钟后
+        pass.setFinishedAt(OffsetDateTime.parse("2026-07-20T01:06:00Z"));
+        pass.setFindingCount(0);
+
+        // findByTaskIdOrderByStartedAtDesc 返回 desc 顺序：pass 在前、block 在后
+        when(auditRepo.findByTaskIdOrderByStartedAtDesc(100L))
+                .thenReturn(new ArrayList<>(Arrays.asList(pass, block)));
+        when(findingRepo.findByAuditId(2L)).thenReturn(Collections.emptyList());
+        whenCustomsMatched();
+        whenInspectionAllPass();
+
+        DecisionRequest req = new DecisionRequest();
+        req.setTaskNo("T-FDA-001");
+        req.setDecision(Constants.DECISION_RELEASE);
+        req.setDecidedBy("QA-01");
+        req.setComment("补录样本后快速重审拿到 PASS，要求放行");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> decisionService.decide(req),
+                "BLOCK→PASS 间隔 5 分钟属于形式合规绕过，必须被 GxP 硬拦截");
+        assertTrue(ex.getMessage().contains("GxP审计历史差异校验拦截"),
+                "异常消息必须明确是 GxP审计历史差异校验拦截");
+        assertTrue(ex.getMessage().contains("fast re-audit after BLOCK"),
+                "异常消息必须明确是 fast re-audit 拦截原因");
+        assertTrue(ex.getMessage().contains("elapsed=300"),
+                "异常消息必须给出实际间隔秒数（5*60=300）");
+    }
+
+    /**
+     * 场景：BLOCK→PASS 间隔 60 分钟（超过 30 分钟整改观察窗）+ 规则版本未降级 → 允许 RELEASE。
+     * 证明修复没有"误伤"真实整改后的合法放行。
+     */
+    @Test
+    void decide_blockToPassAfterRemediationWindow_releaseAccepted() {
+        AuditReport block = new AuditReport();
+        block.setId(1L);
+        block.setTaskId(100L);
+        block.setStatus(Constants.AUDIT_BLOCK);
+        block.setRuleVersion(2);
+        block.setStartedAt(OffsetDateTime.parse("2026-07-20T00:00:00Z"));
+        block.setFinishedAt(OffsetDateTime.parse("2026-07-20T01:00:00Z"));
+        block.setFindingCount(3);
+
+        AuditReport pass = new AuditReport();
+        pass.setId(2L);
+        pass.setTaskId(100L);
+        pass.setStatus(Constants.AUDIT_PASS);
+        pass.setRuleVersion(2);  // 版本未降级
+        pass.setStartedAt(OffsetDateTime.parse("2026-07-20T02:00:00Z"));  // 60 分钟后
+        pass.setFinishedAt(OffsetDateTime.parse("2026-07-20T02:01:00Z"));
+        pass.setFindingCount(0);
+
+        when(auditRepo.findByTaskIdOrderByStartedAtDesc(100L))
+                .thenReturn(new ArrayList<>(Arrays.asList(pass, block)));
+        when(findingRepo.findByAuditId(2L)).thenReturn(Collections.emptyList());
+        whenCustomsMatched();
+        whenInspectionAllPass();
+
+        DecisionRequest req = new DecisionRequest();
+        req.setTaskNo("T-FDA-001");
+        req.setDecision(Constants.DECISION_RELEASE);
+        req.setDecidedBy("QA-01");
+        req.setComment("整改完成后 60 分钟重审通过");
+
+        Map<String, Object> result = decisionService.decide(req);
+
+        assertEquals(Constants.DECISION_RELEASE, result.get("decision"));
+        assertEquals(Constants.TASK_RELEASED, result.get("taskStatus"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> basis = (Map<String, Object>) result.get("basis");
+        assertEquals(true, basis.get("temperatureOk"));
+        assertEquals(true, basis.get("hasPriorBlockAudit"));
+        assertEquals(3600L, basis.get("blockToPassElapsedSec"));
+        assertNull(basis.get("historyRejectReason"));
+    }
+
+    /**
+     * 场景：BLOCK→PASS 间隔足够但最新审计的 rule_version 低于 BLOCK（规则降级绕过）→ 拒绝 RELEASE。
+     * 模拟"通过下调规则版本拿到 PASS"的形式合规绕过。
+     */
+    @Test
+    void decide_blockToPassWithRuleVersionDowngrade_isRejectedByGxpHistoryCheck() {
+        AuditReport block = new AuditReport();
+        block.setId(1L);
+        block.setTaskId(100L);
+        block.setStatus(Constants.AUDIT_BLOCK);
+        block.setRuleVersion(3);  // 旧版本严格规则
+        block.setStartedAt(OffsetDateTime.parse("2026-07-20T00:00:00Z"));
+        block.setFinishedAt(OffsetDateTime.parse("2026-07-20T01:00:00Z"));
+        block.setFindingCount(3);
+
+        AuditReport pass = new AuditReport();
+        pass.setId(2L);
+        pass.setTaskId(100L);
+        pass.setStatus(Constants.AUDIT_PASS);
+        pass.setRuleVersion(2);  // 降到更宽松的规则版本
+        pass.setStartedAt(OffsetDateTime.parse("2026-07-20T03:00:00Z"));  // 2 小时后，间隔足够
+        pass.setFinishedAt(OffsetDateTime.parse("2026-07-20T03:01:00Z"));
+        pass.setFindingCount(0);
+
+        when(auditRepo.findByTaskIdOrderByStartedAtDesc(100L))
+                .thenReturn(new ArrayList<>(Arrays.asList(pass, block)));
+        when(findingRepo.findByAuditId(2L)).thenReturn(Collections.emptyList());
+        whenCustomsMatched();
+        whenInspectionAllPass();
+
+        DecisionRequest req = new DecisionRequest();
+        req.setTaskNo("T-FDA-001");
+        req.setDecision(Constants.DECISION_RELEASE);
+        req.setDecidedBy("QA-01");
+        req.setComment("通过降低规则版本拿到 PASS，要求放行");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> decisionService.decide(req),
+                "规则版本降级必须被 GxP 硬拦截");
+        assertTrue(ex.getMessage().contains("rule_version downgrade"),
+                "异常消息必须明确是规则版本降级拦截");
+        assertTrue(ex.getMessage().contains("latest=2"),
+                "异常消息必须给出最新规则版本");
+        assertTrue(ex.getMessage().contains("priorBlock=3"),
+                "异常消息必须给出 BLOCK 时的规则版本");
+    }
+
+    /**
+     * 场景：BLOCK→PASS 历史异常但用户主动选 CONDITIONAL_RELEASE → 仍允许条件放行。
+     * 修复不阻塞合规的"承认风险附条件放行"路径。
+     */
+    @Test
+    void decide_blockToPassFast_conditionalStillAllowed() {
+        AuditReport block = new AuditReport();
+        block.setId(1L);
+        block.setTaskId(100L);
+        block.setStatus(Constants.AUDIT_BLOCK);
+        block.setRuleVersion(2);
+        block.setStartedAt(OffsetDateTime.parse("2026-07-20T00:00:00Z"));
+        block.setFinishedAt(OffsetDateTime.parse("2026-07-20T01:00:00Z"));
+        block.setFindingCount(3);
+
+        AuditReport pass = new AuditReport();
+        pass.setId(2L);
+        pass.setTaskId(100L);
+        pass.setStatus(Constants.AUDIT_PASS);
+        pass.setRuleVersion(2);
+        pass.setStartedAt(OffsetDateTime.parse("2026-07-20T01:05:00Z"));
+        pass.setFinishedAt(OffsetDateTime.parse("2026-07-20T01:06:00Z"));
+        pass.setFindingCount(0);
+
+        when(auditRepo.findByTaskIdOrderByStartedAtDesc(100L))
+                .thenReturn(new ArrayList<>(Arrays.asList(pass, block)));
+        when(findingRepo.findByAuditId(2L)).thenReturn(Collections.emptyList());
+        whenCustomsMatched();
+        whenInspectionAllPass();
+
+        DecisionRequest req = new DecisionRequest();
+        req.setTaskNo("T-FDA-001");
+        req.setDecision(Constants.DECISION_CONDITIONAL);
+        req.setDecidedBy("QA-01");
+        req.setComment("历史 BLOCK 待核实，附条件放行");
+
+        Map<String, Object> result = decisionService.decide(req);
+
+        assertEquals(Constants.DECISION_CONDITIONAL, result.get("decision"));
+        assertEquals(Constants.TASK_CONDITIONAL, result.get("taskStatus"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> basis = (Map<String, Object>) result.get("basis");
+        assertEquals(false, basis.get("temperatureOk"));
+        assertEquals(true, basis.get("hasPriorBlockAudit"));
+        assertNotNull(basis.get("historyRejectReason"));
+        assertTrue(basis.get("historyRejectReason").toString().contains("fast re-audit"));
+    }
+
     private void whenAuditPass() {
         AuditReport report = new AuditReport();
         report.setId(1L);
