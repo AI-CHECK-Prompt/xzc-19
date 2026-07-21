@@ -227,14 +227,15 @@ public class MultiChainCoordinationEngine {
     // ===== 工具 =====
     private boolean belongsToTask(AuditFinding f, List<TransportSegment> segs, List<TempSample> samples, Long taskId) {
         if (segs == null || segs.isEmpty()) return false;
-        if (f.getTimeRangeStart() == null) return true;
+        if (f.getTimeRangeStart() == null) return false;
         for (TransportSegment s : segs) {
             OffsetDateTime ds = s.getActualDepartAt() == null ? s.getPlannedDepartAt() : s.getActualDepartAt();
             OffsetDateTime as = s.getActualArriveAt() == null ? s.getPlannedArriveAt() : s.getActualArriveAt();
             if (ds == null || as == null) continue;
             if (!f.getTimeRangeStart().isBefore(ds) && !f.getTimeRangeStart().isAfter(as)) return true;
         }
-        return true; // 兜底
+        // finding 的 start 时刻不在任一段窗口内，不属于本任务；不再兜底 true，避免跨任务串扰
+        return false;
     }
 
     private String detectDominantForm(List<DrugBatch> batches) {
