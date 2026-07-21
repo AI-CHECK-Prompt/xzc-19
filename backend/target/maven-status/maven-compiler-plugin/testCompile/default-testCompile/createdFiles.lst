@@ -1,2 +1,2 @@
-com\coldchain\compliance\engine\RuleEngineCumulativeTest.class
 com\coldchain\compliance\service\IngestServiceTest.class
+com\coldchain\compliance\engine\RuleEngineCumulativeTest.class

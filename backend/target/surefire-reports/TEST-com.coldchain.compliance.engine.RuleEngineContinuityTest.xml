@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" name="com.coldchain.compliance.engine.RuleEngineCumulativeTest" time="0.585" tests="3" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" name="com.coldchain.compliance.engine.RuleEngineContinuityTest" time="4.004" tests="4" errors="0" skipped="0" failures="0">
   <properties>
     <property name="sun.desktop" value="windows"/>
     <property name="awt.toolkit" value="sun.awt.windows.WToolkit"/>
@@ -61,7 +61,8 @@
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="52.0"/>
   </properties>
-  <testcase name="cumulative_lastSegmentStillHot_emitsFinding" classname="com.coldchain.compliance.engine.RuleEngineCumulativeTest" time="0.139"/>
-  <testcase name="cumulative_lastSegmentStillCold_emitsFinding" classname="com.coldchain.compliance.engine.RuleEngineCumulativeTest" time="0.287"/>
-  <testcase name="cumulative_lastSegmentShort_noFinding" classname="com.coldchain.compliance.engine.RuleEngineCumulativeTest" time="0.157"/>
+  <testcase name="continuity_sameDeviceRealGap_emitsFinding" classname="com.coldchain.compliance.engine.RuleEngineContinuityTest" time="3.187"/>
+  <testcase name="continuity_singleSample_noFinding" classname="com.coldchain.compliance.engine.RuleEngineContinuityTest" time="0.439"/>
+  <testcase name="continuity_crossDeviceGap_noFalsePositive" classname="com.coldchain.compliance.engine.RuleEngineContinuityTest" time="0.137"/>
+  <testcase name="continuity_bothDevicesGap_emitsTwoFindings" classname="com.coldchain.compliance.engine.RuleEngineContinuityTest" time="0.225"/>
 </testsuite>

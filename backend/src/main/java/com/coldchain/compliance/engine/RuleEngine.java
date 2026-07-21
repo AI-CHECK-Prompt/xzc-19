@@ -183,29 +183,42 @@ public class RuleEngine {
         Map<String, Object> params = JsonUtil.toMap(rule.getExpression());
         long maxGapSec = ((Number) params.getOrDefault("max_gap_sec", 300)).longValue();
 
-        List<TempSample> sorted = new ArrayList<>(samples);
-        sorted.sort(Comparator.comparing(TempSample::getSampleAt));
-
-        for (int i = 1; i < sorted.size(); i++) {
-            Duration gap = Duration.between(sorted.get(i - 1).getSampleAt(), sorted.get(i).getSampleAt());
-            if (gap.getSeconds() > maxGapSec) {
-                AuditFinding f = new AuditFinding();
-                f.setRuleCode(rule.getCode());
-                f.setSeverity(rule.getSeverity());
-                f.setAction(rule.getAction());
-                f.setTimeRangeStart(sorted.get(i - 1).getSampleAt());
-                f.setTimeRangeEnd(sorted.get(i).getSampleAt());
-                f.setAffectedQty(0);
-                f.setDescription(String.format("温控数据连续性中断：%d 秒（阈值 %d 秒）",
-                        gap.getSeconds(), maxGapSec));
-                Map<String, Object> evidence = new LinkedHashMap<>();
-                evidence.put("deviceNo", sorted.get(i - 1).getDeviceNo());
-                evidence.put("prevSampleAt", sorted.get(i - 1).getSampleAt().toString());
-                evidence.put("nextSampleAt", sorted.get(i).getSampleAt().toString());
-                evidence.put("gapSec", gap.getSeconds());
-                evidence.put("maxGapSec", maxGapSec);
-                f.setEvidence(JsonUtil.toJson(evidence));
-                out.add(f);
+        // 多设备冗余架构：按 deviceNo 分组隔离，避免主备设备切换时刻被误判为中断。
+        // 仅当同一设备内相邻样本时间间隔 > 阈值时，才出具 CONTINUITY finding。
+        Map<String, List<TempSample>> byDev = new LinkedHashMap<>();
+        for (TempSample s : samples) {
+            List<TempSample> list = byDev.get(s.getDeviceNo());
+            if (list == null) {
+                list = new ArrayList<>();
+                byDev.put(s.getDeviceNo(), list);
+            }
+            list.add(s);
+        }
+        for (Map.Entry<String, List<TempSample>> e : byDev.entrySet()) {
+            List<TempSample> sorted = new ArrayList<>(e.getValue());
+            sorted.sort(Comparator.comparing(TempSample::getSampleAt));
+            if (sorted.size() < 2) continue;
+            for (int i = 1; i < sorted.size(); i++) {
+                Duration gap = Duration.between(sorted.get(i - 1).getSampleAt(), sorted.get(i).getSampleAt());
+                if (gap.getSeconds() > maxGapSec) {
+                    AuditFinding f = new AuditFinding();
+                    f.setRuleCode(rule.getCode());
+                    f.setSeverity(rule.getSeverity());
+                    f.setAction(rule.getAction());
+                    f.setTimeRangeStart(sorted.get(i - 1).getSampleAt());
+                    f.setTimeRangeEnd(sorted.get(i).getSampleAt());
+                    f.setAffectedQty(0);
+                    f.setDescription(String.format("温控数据连续性中断：%d 秒（阈值 %d 秒）",
+                            gap.getSeconds(), maxGapSec));
+                    Map<String, Object> evidence = new LinkedHashMap<>();
+                    evidence.put("deviceNo", e.getKey());
+                    evidence.put("prevSampleAt", sorted.get(i - 1).getSampleAt().toString());
+                    evidence.put("nextSampleAt", sorted.get(i).getSampleAt().toString());
+                    evidence.put("gapSec", gap.getSeconds());
+                    evidence.put("maxGapSec", maxGapSec);
+                    f.setEvidence(JsonUtil.toJson(evidence));
+                    out.add(f);
+                }
             }
         }
         return out;
