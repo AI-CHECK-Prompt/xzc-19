@@ -54,4 +54,42 @@ public final class Constants {
     public static final String ROLE_QA = "QA";
     public static final String ROLE_CUSTOMS = "CUSTOMS";
     public static final String ROLE_ADMIN = "ADMIN";
+
+    // 段类型
+    public static final String SEG_ROAD = "ROAD";
+    public static final String SEG_SEA = "SEA";
+    public static final String SEG_AIR = "AIR";
+    public static final String SEG_RAIL = "RAIL";
+    public static final String SEG_STORAGE = "STORAGE";   // 堆场/中转（非在途）
+
+    // 段状态
+    public static final String SEG_STATUS_PLANNED = "PLANNED";
+    public static final String SEG_STATUS_DEPARTED = "DEPARTED";
+    public static final String SEG_STATUS_ARRIVED = "ARRIVED";
+    public static final String SEG_STATUS_HANDED_OVER = "HANDED_OVER";
+
+    // 异常类型
+    public static final String EX_OVERHEAT = "OVERHEAT";
+    public static final String EX_UNDERCOOL = "UNDERCOOL";
+    public static final String EX_DOOR_OPEN = "DOOR_OPEN";
+    public static final String EX_TRACK_DEV = "TRACK_DEVIATION";
+    public static final String EX_DEVICE_OFF = "DEVICE_OFFLINE";
+    public static final String EX_SAMPLING_GAP = "SAMPLING_GAP";
+
+    // 责任方
+    public static final String PARTY_CARRIER = "CARRIER";
+    public static final String PARTY_ENTERPRISE = "ENTERPRISE";
+    public static final String PARTY_SUPPLIER = "SUPPLIER";
+
+    // 工单状态
+    public static final String WO_OPEN = "OPEN";
+    public static final String WO_IN_PROGRESS = "IN_PROGRESS";
+    public static final String WO_RESOLVED = "RESOLVED";
+    public static final String WO_CLOSED = "CLOSED";
+    public static final String WO_OVERDUE = "OVERDUE";
+
+    // 监管报告
+    public static final String RR_DRAFT = "DRAFT";
+    public static final String RR_SUBMITTED = "SUBMITTED";
+    public static final String RR_ACK = "ACKNOWLEDGED";
 }
